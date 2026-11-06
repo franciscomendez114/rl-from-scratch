@@ -2,18 +2,12 @@
 
 Reinforcement learning algorithms written from scratch in PyTorch, with no RL libraries. Gymnasium supplies only the environments. The repo starts with a policy gradient method on CartPole-v1 and ends with PPO on LunarLander-v3.
 
-<table>
-  <tr>
-    <th>Before training</th>
-    <th>After training</th>
-  </tr>
-  <tr>
-    <td><img src="lunar_lander_before_training.gif" alt="Untrained agent on LunarLander-v3" width="400"></td>
-    <td><img src="lunar_lander_after_training.gif" alt="Trained PPO agent on LunarLander-v3" width="400"></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="lunar_lander_before_training.gif" alt="Untrained agent on LunarLander-v3" width="49%">
+  <img src="lunar_lander_after_training.gif" alt="Trained PPO agent on LunarLander-v3" width="49%">
+</p>
 
-The left GIF shows the untrained network with sampled actions. It drifts sideways and hits the ground within about 75 steps. The right GIF shows the trained network with greedy actions. It lands between the flags and comes to rest. Each GIF shows a single episode from the same run as the plot in [Results](#results).
+**Left: before training. Right: after training.** The left GIF shows the untrained network with sampled actions. It drifts sideways and hits the ground within about 75 steps. The right GIF shows the trained network with greedy actions. It lands between the flags and comes to rest. Each GIF shows a single episode from the same run as the plot in [Results](#results).
 
 ## Files
 
