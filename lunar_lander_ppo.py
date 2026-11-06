@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+import imageio
 
 class PolicyNetwork(nn.Module):
     def __init__(self, input_dim, output_dim):
@@ -80,7 +81,7 @@ def update_model(model, optimizer, init_log_probs, state, actions, returns):
 
     return loss
 
-def run_episode(env, model, inference=False):
+def run_episode(env, model, inference=False, record=False):
     obs, info = env.reset()
 
     done = False
@@ -90,7 +91,11 @@ def run_episode(env, model, inference=False):
     log_probs = []
     actions = []
     rewards = []
+    frames = []
 
+    if record: 
+        # for rendering the simulation to a gif
+        frames.append(env.render())
 
     while not done:
         # get action from policy network
@@ -102,12 +107,8 @@ def run_episode(env, model, inference=False):
         action_probs = F.softmax(action_logits, dim=-1) # (1, 4)
         action_dist = torch.distributions.Categorical(action_probs)
 
-
         if inference:
-            if cur_state[0][-1] == 1 and cur_state[0][-2] == 1:
-                action = 0
-            else:
-                action = torch.argmax(action_probs).item() # (0, 1, 2, 3)
+            action = torch.argmax(action_probs).item() # (0, 1, 2, 3)
         else:
             action = action_dist.sample().item() # int (0, 1, 2, 3)
 
@@ -117,7 +118,10 @@ def run_episode(env, model, inference=False):
         actions.append(action)
         log_probs.append(F.log_softmax(action_logits, dim=-1).squeeze(0).numpy())
         rewards.append(reward)
-
+        
+        if record:
+            frames.append(env.render())
+        
         obs = next_obs
         episode_length += 1
 
@@ -126,7 +130,7 @@ def run_episode(env, model, inference=False):
 
     discounted_returns = discounted_rewards(np.array(rewards), gamma=0.99)
 
-    return np.array(states), np.array(actions), np.array(log_probs), np.array(rewards), discounted_returns, episode_length
+    return np.array(states), np.array(actions), np.array(log_probs), np.array(rewards), discounted_returns, episode_length, frames
 
 
 def train_model(model, optimizer, env, num_episodes, batch_size=4, num_batch_epochs=5):
@@ -141,7 +145,7 @@ def train_model(model, optimizer, env, num_episodes, batch_size=4, num_batch_epo
     reward_history = []
 
     for episode in range(num_episodes):
-        states, actions, log_probs, rewards, discounted_returns, episode_length = run_episode(env, model)
+        states, actions, log_probs, rewards, discounted_returns, episode_length, _ = run_episode(env, model)
         # states: (T, 8), actions: (T,), discounted_returns: (T,)
         batch_states.append(states)
         batch_actions.append(actions)
@@ -179,7 +183,7 @@ def plot_reward_history(reward_history):
     for i in range(window_size-1, len(reward_history)):
         moving_avg.append(np.mean(reward_history[i-window_size+1:i+1]))
 
-    plt.plot([i for i in range(1, len(reward_history) + 1)], reward_history)
+    plt.plot([i for i in range(1, len(reward_history) + 1)], reward_history, alpha=0.3)
     plt.plot([i for i in range(window_size, len(reward_history) + 1)], moving_avg, color='r', linestyle='--', label='Moving Average')
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
@@ -202,15 +206,31 @@ def main():
     model = PolicyNetwork(input_dim=8, output_dim=4)
     optimizer = optim.AdamW(model.parameters(), lr=3e-4, weight_decay=1e-4)
 
+    # Look at model performance before training
+    print("Running demo before training...")
+    demo_env = gym.make("LunarLander-v3", render_mode="rgb_array")
+    _, _, _, _, _, _, frames = run_episode(demo_env, model, inference=False, record=True)
+
+    imageio.mimsave('lunar_lander_before_training.gif', frames[::2], duration=40, loop=0)
+
+    demo_env.close()
+
+    # Train the model
     env = gym.make("LunarLander-v3")
 
     reward_history = train_model(model, optimizer, env, num_episodes, batch_size, num_batch_epochs)
+    
+    torch.save(model.state_dict(), "lunar_lander_ppo.pt")
 
     plot_reward_history(reward_history)
-    
-    print("Running demo...")
-    demo_env = gym.make("LunarLander-v3", render_mode="human")
-    run_episode(demo_env, model, inference=True)
+
+    print("Running demo after training...")
+    # Rinning model inference on evironment and getting rgb array to save as a gif
+    demo_env = gym.make("LunarLander-v3", render_mode="rgb_array")
+    _, _, _, _, _, _, frames = run_episode(demo_env, model, inference=True, record=True)
+
+    imageio.mimsave('lunar_lander_after_training.gif', frames[::2], duration=40, loop=0)
+
     demo_env.close()
 
 if __name__ == "__main__":

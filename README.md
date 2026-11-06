@@ -2,11 +2,26 @@
 
 Reinforcement learning algorithms written from scratch in PyTorch, with no RL libraries. Gymnasium supplies only the environments. The repo starts with a policy gradient method on CartPole-v1 and ends with PPO on LunarLander-v3.
 
+<table>
+  <tr>
+    <th>Before training</th>
+    <th>After training</th>
+  </tr>
+  <tr>
+    <td><img src="lunar_lander_before_training.gif" alt="Untrained agent on LunarLander-v3" width="400"></td>
+    <td><img src="lunar_lander_after_training.gif" alt="Trained PPO agent on LunarLander-v3" width="400"></td>
+  </tr>
+</table>
+
+The left GIF shows the untrained network with sampled actions. It drifts sideways and hits the ground within about 75 steps. The right GIF shows the trained network with greedy actions. It lands between the flags and comes to rest. Each GIF shows a single episode from the same run as the plot in [Results](#results).
+
 ## Files
 
 - `cartpole_reinforce.py`: Policy gradient with a learned value baseline (actor-critic style) on CartPole-v1. Shared network with policy and value heads, Monte Carlo returns, one update per episode, 1500 episodes, then 3 rendered demo episodes.
-- `lunar_lander_ppo.py`: PPO with a clipped surrogate objective on LunarLander-v3. Trains for 2000 episodes, saves a reward plot, then runs 1 rendered demo episode.
-- `lunar_lander_reward.png`: Reward curve from one training run of `lunar_lander_ppo.py`.
+- `lunar_lander_ppo.py`: PPO with a clipped surrogate objective on LunarLander-v3. Records an episode before training, trains for 2000 episodes, saves the weights and a reward plot, then records an episode after training.
+- `lunar_lander_before_training.gif`, `lunar_lander_after_training.gif`: Episodes recorded by `lunar_lander_ppo.py` before and after training (every second frame).
+- `lunar_lander_reward.png`: Reward curve from the same run.
+- `lunar_lander_ppo.pt`: Trained weights from the same run, saved as a PyTorch `state_dict` for `PolicyNetwork(input_dim=8, output_dim=4)`.
 - `requirements.txt`: Pinned Python dependencies.
 
 ## How to run
@@ -22,7 +37,15 @@ Then:
     pip install -r requirements.txt
     python lunar_lander_ppo.py
 
-When training finishes, the script saves `lunar_lander_reward.png` and opens the plot in a window. The demo episode starts after you close that window.
+The script runs these steps in order:
+
+1. Records one episode with the untrained network to `lunar_lander_before_training.gif`.
+2. Trains for 2000 episodes, printing the 50-episode average reward every 50 episodes.
+3. Saves the weights to `lunar_lander_ppo.pt`.
+4. Saves `lunar_lander_reward.png` and opens the plot in a window.
+5. After you close the plot window, records one episode with the trained network to `lunar_lander_after_training.gif`.
+
+Running the script overwrites the files in the repo.
 
 To run the CartPole script:
 
@@ -39,7 +62,7 @@ All values below come from `lunar_lander_ppo.py`.
 - **Value loss:** MSE against the scaled returns, weight 0.5. No entropy bonus.
 - **Optimizer:** AdamW, lr 3e-4, weight decay 1e-4.
 - **Batching:** 8 episodes per batch, reused for 50 full-batch gradient steps (no minibatches). The batch is then discarded.
-- **Training vs demo:** Training samples actions from the policy. The demo picks the greedy action, except that it forces action 0 (do nothing) when both leg-contact flags are 1.
+- **Action selection:** Training and the before-training GIF sample actions from the policy. The after-training GIF takes the greedy (argmax) action.
 
 ## Results
 
@@ -47,7 +70,7 @@ All values below come from `lunar_lander_ppo.py`.
 
 Settings for this run: batch of 8 episodes, 50 epochs per batch, lr 3e-4, 2000 episodes.
 
-The 50-episode moving average crosses the solved threshold of 200 around episode 680. After that it mostly stays between about 250 and 280, with a dip to about 220 near episode 800. Training samples its actions, so the raw per-episode curve has dips even after the agent has learned to land.
+The 50-episode moving average (dashed red) crosses the solved threshold of 200 around episode 700. After that it mostly stays between about 200 and 265, with dips to about 175 near episode 900 and about 185 near episode 1750. The raw per-episode rewards (light blue) still dip often after the agent has learned to land, because training samples its actions.
 
 Runs are not seeded, so exact numbers vary between runs.
 
@@ -71,7 +94,7 @@ Each row is a single run of an earlier version of the code. Those versions are n
 5. The full clipped objective (the minimum of the clipped and unclipped terms) crossed 200 around episode 950 and stayed between about 210 and 257.
 6. The final settings are the ones in the current code. See Results.
 
-In several runs, the reward jumped by about 100 at once. Each jump matched the agent learning to land and shut off its engines instead of hovering, which collects the landing bonus. The moving average in the Results plot shows a jump like this between episodes 650 and 700.
+In several runs, the reward jumped by about 100 at once. Each jump matched the agent learning to land and shut off its engines instead of hovering, which collects the landing bonus. The moving average in the Results plot shows a jump like this between episodes 650 and 750.
 
 ## Next steps
 
