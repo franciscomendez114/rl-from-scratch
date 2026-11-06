@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 class PolicyNetwork(nn.Module):
     def __init__(self, input_dim, output_dim):
@@ -137,6 +138,8 @@ def train_model(model, optimizer, env, num_episodes, batch_size=4, num_batch_epo
     batch_log_probs = []
     episode_rewards = []
 
+    reward_history = []
+
     for episode in range(num_episodes):
         states, actions, log_probs, rewards, discounted_returns, episode_length = run_episode(env, model)
         # states: (T, 8), actions: (T,), discounted_returns: (T,)
@@ -144,7 +147,9 @@ def train_model(model, optimizer, env, num_episodes, batch_size=4, num_batch_epo
         batch_actions.append(actions)
         batch_log_probs.append(log_probs)
         batch_returns.append(discounted_returns)
-        episode_rewards.append(rewards.sum())
+        
+        episode_rewards.append(rewards.sum().item())
+        reward_history.append(rewards.sum().item())
 
         if len(batch_states) >= batch_size:
             for _ in range(num_batch_epochs):
@@ -160,8 +165,33 @@ def train_model(model, optimizer, env, num_episodes, batch_size=4, num_batch_epo
 
         if (episode + 1) % 50 == 0:
             print(f"Episode {episode + 1}, Length: {episode_length}, Reward: {np.mean(episode_rewards[-50:])}")
-
+    
     env.close()
+
+    return reward_history
+
+def plot_reward_history(reward_history):
+
+    # caluclate moving average of reward history
+    window_size = 50
+    moving_avg = []
+
+    for i in range(window_size-1, len(reward_history)):
+        moving_avg.append(np.mean(reward_history[i-window_size+1:i+1]))
+
+    plt.plot([i for i in range(1, len(reward_history) + 1)], reward_history)
+    plt.plot([i for i in range(window_size, len(reward_history) + 1)], moving_avg, color='r', linestyle='--', label='Moving Average')
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.title("Reward History")
+
+    plt.axhline(y=200, alpha=0.3, color='r', linestyle='--', label='Solved Threshold (200)')
+
+    plt.legend()
+
+    plt.savefig('lunar_lander_reward.png', dpi=150)
+
+    plt.show()
 
 def main():
 
@@ -174,8 +204,10 @@ def main():
 
     env = gym.make("LunarLander-v3")
 
-    train_model(model, optimizer, env, num_episodes, batch_size, num_batch_epochs)
+    reward_history = train_model(model, optimizer, env, num_episodes, batch_size, num_batch_epochs)
 
+    plot_reward_history(reward_history)
+    
     print("Running demo...")
     demo_env = gym.make("LunarLander-v3", render_mode="human")
     run_episode(demo_env, model, inference=True)
